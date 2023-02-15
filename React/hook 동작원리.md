@@ -7,137 +7,41 @@ React hook에서는 이를 **클로저**를 통해 해결한다.
 
 > 💡클로저란 함수가 자신이 속한 lexical scope를 기억하여 lexical scope 밖에서 실행될 때도 그 스코프에 접근할 수 있는 특성
 
-### useState 구현
+### useState / useEffect 구현
 
-<details>
-  <summary>🏋️‍♀️</summary>
-  
-```javascript
-function useState(initialVal) {
-  let _val = initialVal;
-
-const state = () => \_val;
-
-const setState = (newVal) => {
-\_val = newVal;
-};
-
-return [state, setState];
-}
-
-const [counter, setCounter] = useState(0);
-console.log(counter()); // 0
-setCounter(1);
-console.log(counter()); // 1
-
-````
-
-☠️ state가 getter 함수다.
-
-💡 state를 변수로 바꿔보자.
+대충 이런 느낌
 
 ```javascript
-function useState(initialVal) {
-  let state = initialVal;
+/** useState */
 
-  const setState = (newVal) => {
-    state = newVal;
-  };
-
-  return [state, setState];
-}
-
-const [counter, setCounter] = useState(0);
-console.log(counter); // 0
-setCounter(1);
-console.log(counter); // 0
-````
-
-☠️ 변경된 변수 값을 참조할 수 없다.
-
-💡 useState를 통해 생성한 상태를 접근하고 유지하려면 state를 useState 바깥에 선언하자.
-
-```javascript
-const React = (function () {
-  let _val;
-
-  return {
-    useState(initialVal) {
-      _val ||= initialVal;
-
-      const setState = (newVal) => {
-        _val = newVal;
-      };
-
-      return [_val, setState];
-    },
-
-    render(Component) {
-      idx = 0;
-      const Comp = Component();
-      Comp.render();
-      return Comp;
-    },
-  };
-
-  return { useState, render };
-})();
-d;
-
-function Component() {
-  const [counter, setCounter] = React.useState(0);
-
-  return {
-    render: () => console.log(counter),
-    click: () => setCounter(counter + 1),
-  };
-}
-
-let App = React.render(Counter); // render: { count: 0 }
-App.click();
-App = React.render(Counter); // render: { count: 1 }
-```
-
-☠️ 훅을 여러번 사용하면 하나의 변수에 계속 값을 덮어쓰므로 여러 상태를 가질 수 없다.
-
-💡 state를 배열 형식으로 관리하자.
-
-</details>
-  
-```javascript
 const React = (function () {
   let states = [];
   let idx = 0;
 
-return {
-useState(initialVal) {
-const state = states[idx] || initialVal;
-const \_idx = idx;
-const setState = (newVal) => {
-states[_idx] = newVal;
-};
+  return {
+    useState(initialVal) {
+      const state = states[idx] || initialVal;
+      const _idx = idx;
+      const setState = (newVal) => {
+        states[_idx] = newVal;
+      };
 
       idx++;
       return [state, setState];
     },
-
     render(Component) {
       idx = 0;
       const Comp = Component();
       Comp.render();
       return Comp;
     },
-
-};
-
-return { useState, render };
+  };
 })();
-
-````
-
-### useEffect 구현
+```
 
 ```javascript
+/** useEffect */
+
 function useEffect(callback, depArray) {
   const hasNoDeps = !depArray;
   const deps = states[idx]; // type: array | undefined
@@ -150,7 +54,37 @@ function useEffect(callback, depArray) {
   }
   idx++;
 }
-````
+```
+
+- hook이 호출되면 클로저를 형성한다.
+
+- 클로저의 특성으로 인해 훅이 다시 호출되어도 이전 값을 참조할 수 있다.
+
+## 실제 hook이 참조하는 환경?
+
+```jsx
+const hook: Hook = {
+  memoizedState: null,
+
+  baseState: null,
+  baseQueue: null,
+  queue: null,
+
+  next: null,
+};
+```
+
+- memoizedState
+  - 이전 state를 저장하고 있어 useState hook이 다시 호출되어도 이전 state를 참조할 수 있다.
+  - 이전 effect를 저장하고 있어 deps를 비교할 수 있다.
+
+- next
+  - hook들의 클로저가 참조하는 환경은 next 프로퍼티를 통해 연결리스트 형태로 연결된다.
+  - 연결리스트를 따라 이전 값을 참조하고 변경하기 때문에 훅의 실행 순서가 보장되어야 한다.
+
+- queue
+  - dispatch: 상태 업데이트
+  - last: 배치 업데이트 처리 후 생성
 
 ## hook 사용 규칙
 
